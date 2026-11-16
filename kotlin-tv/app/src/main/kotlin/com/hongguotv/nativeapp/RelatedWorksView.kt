@@ -20,6 +20,8 @@ internal class RelatedWorksView(
     private val reload: () -> Unit,
 ) : LinearLayout(context) {
     private var allDialog: AlertDialog? = null
+    /** What down from a card reaches (the page's next item); the card itself when nothing follows. */
+    var belowId: Int = View.NO_ID
     private var refreshButton: TextView? = null
     private val labels = mutableListOf<Pair<RelatedWork, TextView>>()
 
@@ -67,11 +69,12 @@ internal class RelatedWorksView(
         if (status.isNotBlank())
             addView(
                 label(status, 13f).apply {
-                    setTextColor(Color.LTGRAY)
+                    setTextColor(TvStyle.muted)
                     setPadding(0, dp(8), 0, dp(8))
                 }
             )
-        upper.takeLast(10).forEach { it.nextFocusDownId = refresh.id }
+        // The episodes above are a single row: every one of them leads down here.
+        upper.forEach { it.nextFocusDownId = refresh.id }
     }
 
     fun loading() {
@@ -79,11 +82,11 @@ internal class RelatedWorksView(
     }
 
     fun failed() {
-        reset("相关作品暂时无法加载，可按刷新重试；当前剧集仍可正常观看。")
+        reset("相关作品加载失败")
     }
 
     fun show(rows: List<RelatedWork>) {
-        reset(if (rows.isEmpty()) "暂无相关剧集" else "左右选择其他季；待上线作品可预约")
+        reset(if (rows.isEmpty()) "暂无相关剧集" else "")
         if (rows.isEmpty()) return
         val allButton = label("全部季 / 相关作品 · ${rows.size} 项 ›").apply {
             id = View.generateViewId()
@@ -99,9 +102,15 @@ internal class RelatedWorksView(
                 isHorizontalScrollBarEnabled = false
                 clipToPadding = false
             }
-        val line = LinearLayout(context).apply { orientation = HORIZONTAL }
+        // Room for the focus lift sits on the row itself (the scroll view clips the row to its
+        // bounds); negative margins keep the cards aligned with the heading.
+        val lift = dp(12)
+        val line = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            setPadding(lift, lift, lift, lift)
+        }
         scroll.addView(line)
-        addView(scroll)
+        addView(scroll, LayoutParams(-1, -2).apply { leftMargin = -lift; rightMargin = -lift; topMargin = -lift })
         val cards =
             rows.map { work ->
                 val card =
@@ -112,13 +121,14 @@ internal class RelatedWorksView(
                         isFocusable = true
                         isFocusableInTouchMode = true
                         contentDescription = work.series.title + "，" + work.label
-                        setPadding(dp(5), dp(5), dp(5), dp(9))
-                        background = TvStyle.card(context, false)
+                        setPadding(dp(6), dp(6), dp(6), dp(9))
+                        background = TvStyle.poster(context, false)
                     }
                 val image =
                     ImageView(context).apply {
                         scaleType = ImageView.ScaleType.CENTER_CROP
                         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+                        TvStyle.roundPoster(this)
                     }
                 val posterHeight = ((dp(142) - dp(10)) / TvStyle.POSTER_ASPECT).roundToInt()
                 card.addView(image, LayoutParams(-1, posterHeight))
@@ -137,7 +147,7 @@ internal class RelatedWorksView(
                 labels += work to status
                 card.setOnClickListener { open(work, card) }
                 card.setOnFocusChangeListener { view, focused ->
-                    view.background = TvStyle.card(context, focused)
+                    view.background = TvStyle.poster(context, focused)
                     if (focused) {
                         loadCover(image, work.series.cover)
                         view.requestRectangleOnScreen(
@@ -153,7 +163,7 @@ internal class RelatedWorksView(
             card.nextFocusLeftId = cards.getOrNull(index - 1)?.id ?: card.id
             card.nextFocusRightId = cards.getOrNull(index + 1)?.id ?: card.id
             card.nextFocusUpId = allButton.id
-            card.nextFocusDownId = card.id
+            card.nextFocusDownId = if (belowId != View.NO_ID) belowId else card.id
         }
         refreshButton?.nextFocusDownId = allButton.id
         allButton.nextFocusUpId = refreshButton?.id ?: allButton.id
@@ -178,12 +188,13 @@ internal class RelatedWorksView(
                 id = View.generateViewId()
                 isFocusable = true
                 setPadding(dp(6), dp(6), dp(6), dp(6))
-                background = TvStyle.card(context, false)
+                background = TvStyle.poster(context, false)
                 contentDescription = work.series.title + "，" + work.label
                 tag = "all-${work.series.id}"
                 val poster = ImageView(context).apply {
                     scaleType = ImageView.ScaleType.CENTER_CROP
                     importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+                    TvStyle.roundPoster(this)
                 }
                 addView(poster, LayoutParams(-1, dp(164)))
                 loadCover(poster, work.series.cover)
@@ -194,7 +205,7 @@ internal class RelatedWorksView(
                 })
                 addView(label(if (work.upcoming) reserveLabel(work) else work.label, 12f))
                 setOnFocusChangeListener { v, focused ->
-                    v.background = TvStyle.card(context, focused)
+                    v.background = TvStyle.poster(context, focused)
                     if (focused) loadCover(poster, work.series.cover)
                 }
                 setOnClickListener { allDialog?.dismiss(); open(work, anchor) }

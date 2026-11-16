@@ -218,7 +218,7 @@ class AccountController(private val activity: Activity, private val play: (Cloud
 
     fun reserve(work: RelatedWork, done: (String) -> Unit) {
         val account = credentials ?: run { show(); done("请先登录"); return }
-        if (busy || closed) { done("正在处理，请稍候"); return }
+        if (busy || closed) { done("处理中"); return }
         if (reservationLabel(work) == "已预约") { done("已预约"); return }
         val submitted = work.series.id in acceptedReservations
         val token = generation
@@ -276,7 +276,7 @@ class AccountController(private val activity: Activity, private val play: (Cloud
 
     fun changeFavorite(series: Series, add: Boolean, done: (String) -> Unit) {
         val account = credentials ?: run { show(); done("请先登录"); return }
-        if (closed || favorites.loading) { done("正在处理，请稍候"); return }
+        if (closed || favorites.loading) { done("处理中"); return }
         val pending = unconfirmedFavorites[series.id]
         if (pending != null && pending != add) { done("上次操作正在同步"); return }
         val token = generation
@@ -453,7 +453,7 @@ class AccountController(private val activity: Activity, private val play: (Cloud
     fun show() {
         if (closed) return
         if (busy) {
-            toast("账号操作进行中，请稍候")
+            toast("处理中")
             return
         }
         val signed = credentials != null
@@ -478,7 +478,7 @@ class AccountController(private val activity: Activity, private val play: (Cloud
                         AlertDialog.Builder(activity)
                             .setTitle("账号同步状态")
                             .setMessage(
-                                "$status\n\n登录后，电视播放的进度会自动上传。手机记录可从「云端继续观看」打开。平台接口可能变化，首次使用请对照手机核对集数和时间。\n本机历史与云端记录分别保留；退出登录会停止上传。"
+                                status
                             )
                             .setPositiveButton("关闭", null)
                     )
@@ -526,7 +526,7 @@ class AccountController(private val activity: Activity, private val play: (Cloud
         var country = "86"
         val countryButton =
             Button(context).apply {
-                text = "+86 ▾"
+                text = "+86 ›"
                 isAllCaps = false
             }
         val mobile =
@@ -677,7 +677,7 @@ class AccountController(private val activity: Activity, private val play: (Cloud
         countryButton.setOnClickListener {
             pickCountryCode(context, country) { picked ->
                 country = picked
-                countryButton.text = "+$picked ▾"
+                countryButton.text = "+$picked ›"
             }
         }
 

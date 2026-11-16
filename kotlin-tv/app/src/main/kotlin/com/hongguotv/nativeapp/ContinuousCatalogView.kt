@@ -103,7 +103,7 @@ internal class ContinuousCatalogView(
                     isLongClickable = false
                     if (this is ViewGroup) descendantFocusability = FOCUS_BLOCK_DESCENDANTS
                     background =
-                        TvStyle.card(
+                        TvStyle.poster(
                             context,
                             grid.hasFocus() && grid.selectedItemPosition == position,
                         )
@@ -232,7 +232,7 @@ internal class ContinuousCatalogView(
 
     private fun paintFocus() {
         for (i in 0 until grid.childCount) grid.getChildAt(i).background =
-            TvStyle.card(
+            TvStyle.poster(
                 context,
                 grid.hasFocus() && grid.firstVisiblePosition + i == grid.selectedItemPosition,
             )
@@ -241,10 +241,10 @@ internal class ContinuousCatalogView(
     private fun paintStatus() {
         status.text =
             when {
-                entries.isEmpty() && !available -> "暂无结果，可切换分类或搜索词"
+                entries.isEmpty() && !available -> "暂无结果"
                 busy -> "已加载 ${entries.size} 部 · 正在加载…"
-                failed -> "加载失败$failureReason，已保留列表 · 按「重试加载」重试"
-                available -> "已加载 ${entries.size} 部 · 向下浏览继续加载"
+                failed -> "加载失败$failureReason"
+                available -> "已加载 ${entries.size} 部"
                 else -> "共 ${entries.size} 部 · 已加载完毕"
             }
         next.text =
@@ -388,7 +388,7 @@ internal class CatalogPosterCard(context: Context) : LinearLayout(context) {
             scaleType = ImageView.ScaleType.CENTER_CROP
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-    val poster = FrameLayout(context)
+    val poster = FrameLayout(context).also { TvStyle.roundPoster(it) }
     val title =
         TextView(context).apply {
             textSize = 14f

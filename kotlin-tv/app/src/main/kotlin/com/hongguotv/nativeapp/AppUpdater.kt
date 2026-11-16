@@ -168,7 +168,7 @@ class AppUpdater(
         )
         body.addView(
             TextView(activity).apply {
-                text = "后台检查与下载不会弹窗或打断浏览。请在此处主动安装新版，收藏与观看记录保留。"
+                visibility = View.GONE
                 textSize = 13f
                 setTextColor(TvStyle.muted)
                 setPadding(0, (8 * dp).toInt(), 0, (8 * dp).toInt())

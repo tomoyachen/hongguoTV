@@ -124,10 +124,10 @@ internal class HomeFeedScreen(
         }.also { main.postDelayed(it, 1000) }
     }
     private val title = label("发现下一部好剧", 25f)
-    private val meta = label("随心看", 13f, TvVisual.accent)
-    private val intro = label("左右换剧，当前作品自动连播。", 15f, TvStyle.muted)
+    private val meta = label("随心看", 13f, TvStyle.muted)
+    private val intro = label("", 15f, TvStyle.muted)
     private val status = label("正在准备热门作品…", 15f)
-    private val tag = label("热门发现", 12f, TvVisual.accent)
+    private val tag = label("热门发现", 12f, Color.argb(170, 255, 255, 255))
     private val info = LinearLayout(activity).apply { orientation = VERTICAL; gravity = Gravity.CENTER_VERTICAL }
     private val actions = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
     private val buttons = mutableListOf<TextView>()
@@ -162,15 +162,14 @@ internal class HomeFeedScreen(
                 setAutoSizeTextTypeUniformWithConfiguration(10, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
             }
             minHeight = dp(44)
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-            background = TvStyle.card(activity, false)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            TvStyle.stylePill(this)
             setOnFocusChangeListener { _, _ -> paintButton(this) }
             setOnClickListener { action() }
         }
 
     private fun paintButton(button: TextView) {
-        button.background = TvStyle.card(activity, button.hasFocus(), button.isSelected)
-        button.setTextColor(if (button.isSelected) TvVisual.accent else TvStyle.text)
+        button.refreshDrawableState()
         button.setTypeface(null, if (button.isSelected) Typeface.BOLD else Typeface.NORMAL)
     }
 
@@ -204,13 +203,9 @@ internal class HomeFeedScreen(
             }
         val typeChoices = listOf(recommendButton, comicButton, realButton, refresh)
         typeChoices.forEachIndexed { i, b ->
-            types.addView(
-                b,
-                lp(0, dp(40)).apply {
-                    weight = 1f
-                    rightMargin = dp(8)
-                },
-            )
+            // Natural-width pills, like a tvOS segmented row, not stretched across the screen.
+            b.setPadding(dp(22), b.paddingTop, dp(22), b.paddingBottom)
+            types.addView(b, lp(-2, dp(40)).apply { rightMargin = dp(10) })
             b.nextFocusUpId = b.id
             b.nextFocusDownId = stage.id
             b.nextFocusLeftId = typeChoices.getOrNull(i - 1)?.id ?: b.id
@@ -218,7 +213,7 @@ internal class HomeFeedScreen(
         }
         addView(types, lp(-1, dp(48)))
         val carousel = FrameLayout(activity).apply { clipChildren = false; clipToPadding = false }
-        hero.background = TvVisual.panel(activity)
+        hero.background = TvStyle.poster(activity, false)
         hero.clipToOutline = true
         hero.elevation = 0f
         hero.setPadding(dp(2), dp(2), dp(2), dp(2))
@@ -232,7 +227,7 @@ internal class HomeFeedScreen(
         stage.isFocusableInTouchMode = true
         stage.isClickable = true
         stage.contentDescription = "左右换剧，确定暂停或继续，下键进入操作"
-        stage.background = TvStyle.shape(activity, Color.BLACK, radius = 7)
+        stage.background = TvStyle.shape(activity, Color.BLACK, radius = 14)
         stage.clipToOutline = true
         stage.addView(playback.view, FrameLayout.LayoutParams(-1, -1))
         stage.addView(poster, FrameLayout.LayoutParams(-1, -1))
@@ -256,7 +251,7 @@ internal class HomeFeedScreen(
         intro.ellipsize = TextUtils.TruncateAt.END
         info.addView(intro)
         info.setPadding(dp(12), dp(10), dp(12), dp(10))
-        info.setBackgroundColor(TvStyle.surface)
+        // Text sits on the page itself, no grey box behind it.
         info.addView(status)
         content.addView(info, lp(dp(220), -1))
         body.addView(content, lp(-1, 0).apply { weight = 1f })
@@ -287,13 +282,8 @@ internal class HomeFeedScreen(
         }
         buttons += listOf(watchButton, favoriteButton, relatedButton)
         buttons.forEachIndexed { index, b ->
-            actions.addView(
-                b,
-                lp(0, dp(44)).apply {
-                    weight = 1f
-                    if (index < buttons.lastIndex) rightMargin = dp(10)
-                },
-            )
+            b.setPadding(dp(24), b.paddingTop, dp(24), b.paddingBottom)
+            actions.addView(b, lp(-2, dp(44)).apply { if (index < buttons.lastIndex) rightMargin = dp(12) })
             b.nextFocusLeftId = buttons.getOrNull(index - 1)?.id ?: b.id
             b.nextFocusRightId = buttons.getOrNull(index + 1)?.id ?: b.id
             b.nextFocusUpId = stage.id
@@ -304,9 +294,6 @@ internal class HomeFeedScreen(
         positionLabel.gravity = Gravity.CENTER
         positionLabel.setPadding(0, 0, 0, 0)
         addView(positionLabel, lp(-1, dp(24)))
-        addView(label("← →  换剧     OK  暂停 / 继续     ↓  操作     ↑  分类", 12f, TvStyle.muted).apply {
-            gravity = Gravity.CENTER
-        }, lp(-1, dp(24)))
         stage.nextFocusLeftId = stage.id
         stage.nextFocusRightId = stage.id
         stage.nextFocusUpId = recommendButton.id
@@ -318,7 +305,7 @@ internal class HomeFeedScreen(
                     .id
         }
         stage.setOnFocusChangeListener { _, focused ->
-            hero.background = TvStyle.card(activity, focused)
+            hero.background = TvStyle.poster(activity, focused)
         }
         stage.setOnClickListener { toggle() }
         hero.setOnClickListener { toggle() }
@@ -438,7 +425,7 @@ internal class HomeFeedScreen(
             failed = true
             poster.visibility = View.VISIBLE
             status.visibility = View.VISIBLE
-            status.text = "加载超时 · 按确定重试，或左右换剧"
+            status.text = "加载超时"
             paintActions()
             return
         }
@@ -555,7 +542,7 @@ internal class HomeFeedScreen(
             hero.animate().alpha(1f).translationX(0f).setDuration(240).start()
         }
         ensureNextWorks()
-        positionLabel.text = if (series == null) "正在发现好剧" else "第 ${state.index + 1} 部 · 左右换剧 · ${if (autoNext) "自动连播下一集" else "播完本集停止"}"
+        positionLabel.text = if (series == null) "正在发现好剧" else "第 ${state.index + 1} 部"
         title.text = series?.title ?: "发现下一部好剧"
         meta.text =
             if (series == null) "随心看"
@@ -564,7 +551,7 @@ internal class HomeFeedScreen(
                     .filter(String::isNotBlank)
                     .joinToString(" · ")
         intro.text =
-            series?.description?.ifBlank { "当前剧集自动连续播放，左右切换其他作品。" } ?: "选择漫剧或真人剧，左右换一部，找到想追的故事。"
+            series?.description.orEmpty()
         tag.text = if (state.recommendation) "推荐 · 随心看" else "${state.category.label}推荐 · 随心看"
         paintActions()
     }
@@ -881,7 +868,7 @@ internal class HomeFeedScreen(
         if (!autoNext || finished.trialEpisodeIndex >= finished.episodeCount) {
             state.userPaused = true
             status.visibility = View.VISIBLE
-            status.text = if (finished.trialEpisodeIndex >= finished.episodeCount) "本剧已播完 · 左右换剧，或确定重播本集" else "本集已播完 · 已关闭自动下一集，可下键选集"
+            status.text = if (finished.trialEpisodeIndex >= finished.episodeCount) "本剧已播完" else "本集已播完 · 自动下一集已关闭"
             paintActions()
             return
         }

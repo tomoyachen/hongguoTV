@@ -251,7 +251,7 @@ internal class TvSearchPanel(
         if (history.isNotEmpty()) words.addView(label("最近搜索", 22f))
         val historyLine = LinearLayout(context).apply { orientation = VERTICAL }
         val historyTitle = words.getChildAt(words.childCount - 1)
-        val emptyHistory = label("输入剧名或拼音首字母，联想词会显示在这里", 16f).apply {
+        val emptyHistory = label("", 16f).apply {
             visibility = if (history.isEmpty()) VISIBLE else GONE
         }
         words.addView(emptyHistory)

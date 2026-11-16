@@ -1,0 +1,6 @@
+<resources>
+    <!-- Cards and pills draw their own focus; Android 8+'s grey default highlight would double it. -->
+    <style name="AppTheme" parent="AppThemeBase">
+        <item name="android:defaultFocusHighlightEnabled">false</item>
+    </style>
+</resources>

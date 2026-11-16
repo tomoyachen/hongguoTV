@@ -84,21 +84,21 @@ internal class ProducerWorksDialog(
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
                 isFocusable = true; isFocusableInTouchMode = true
                 setPadding(dp(8), dp(6), dp(8), dp(6))
-                background = TvStyle.card(activity, false)
+                background = TvStyle.poster(activity, false)
                 contentDescription = series.title
             }
-            val poster = ImageView(activity).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+            val poster = ImageView(activity).apply { scaleType = ImageView.ScaleType.CENTER_CROP; TvStyle.roundPoster(this, 8) }
             card.addView(poster, LinearLayout.LayoutParams(dp(63), dp(84)))
             card.addView(label(series.title + "\n" + series.badge).apply { maxLines = 3 }, LinearLayout.LayoutParams(0, -2, 1f))
             loadCover(poster, series.cover)
             card.setOnFocusChangeListener { v, focused ->
-                v.background = TvStyle.card(activity, focused)
+                v.background = TvStyle.poster(activity, focused)
                 if (focused) loadCover(poster, series.cover)
             }
             card.setOnClickListener { close(); openSeries(series) }
             list.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) })
         }
-        status.text = "已确认 ${rows.size} 部作品"
+        status.text = "${rows.size} 部作品"
     }
 
     private fun loadPage() {
@@ -114,9 +114,9 @@ internal class ProducerWorksDialog(
                     page++
                     more.isEnabled = next.hasMore
                     more.text = if (next.hasMore) "加载更多作品" else "已显示当前可检索作品"
-                    status.text = "已确认 ${rows.size} 部作品 · 以平台当前检索结果为准"
+                    status.text = "${rows.size} 部作品"
                 }, {
-                    status.text = "已确认 ${rows.size} 部作品 · 更多作品暂时无法读取"
+                    status.text = "${rows.size} 部作品 · 更多加载失败"
                     more.text = "重试查找更多作品"; more.isEnabled = true
                 })
             }

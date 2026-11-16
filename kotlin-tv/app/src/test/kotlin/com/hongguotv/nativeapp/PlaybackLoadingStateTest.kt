@@ -69,7 +69,7 @@ class PlaybackLoadingStateTest {
             val budget = activity.javaClass.getDeclaredField("recovery").apply { isAccessible = true }.get(activity) as RecoveryBudget
             repeat(RecoveryBudget.FAST_ATTEMPTS) { budget.consume() }
             call(activity, "scheduleRecovery")
-            assertTrue(status.text.contains("快速恢复暂未成功"))
+            assertTrue(status.text.contains("恢复未成功"))
             assertEquals("继续等待恢复", action.text.toString())
             assertTrue(action.isEnabled)
             repeat(5) { budget.consume() }

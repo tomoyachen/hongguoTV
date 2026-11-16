@@ -2,6 +2,7 @@
 package com.hongguotv.nativeapp
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.Rect
 import android.text.TextUtils
@@ -46,9 +47,9 @@ class SeriesPreview(context: Context) : LinearLayout(context) {
     }
 
     fun show(series: Series?, status: String) {
-        val nextTitle = series?.title ?: "选择下方作品查看信息"
+        val nextTitle = series?.title.orEmpty()
         val nextMeta =
-            if (series == null) "方向键选择 · 确认打开作品"
+            if (series == null) ""
             else
                 listOf(status, series.badge, series.tags)
                     .flatMap { it.split('·') }
@@ -114,9 +115,30 @@ class HomeScreen(
 
     private val accent = TvStyle.accent
 
+    private fun currentCovers(): Map<String, android.graphics.drawable.Drawable> =
+        cards.values.mapNotNull { card ->
+            val cover = card.entry?.series?.cover ?: return@mapNotNull null
+            card.image?.drawable?.let { cover to it }
+        }.toMap()
+
+    // The owner builds a new HomeScreen whenever home data changes; hand the covers over to it.
+    override fun onDetachedFromWindow() {
+        carriedCovers = currentCovers().entries.take(MAX_CARRIED).associate { it.key to it.value }
+        super.onDetachedFromWindow()
+    }
+
+    private companion object {
+        const val MAX_CARRIED = 40
+        var carriedCovers: Map<String, android.graphics.drawable.Drawable> = emptyMap()
+        const val POSTERS_PER_ROW = 7
+        const val POSTER_GAP_DP = 22
+        const val LIFT_ROOM_DP = 16
+    }
+
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
 
-    private fun shape(focus: Boolean) = TvStyle.card(context, focus)
+    private fun shape(@Suppress("UNUSED_PARAMETER") focus: Boolean): android.graphics.drawable.Drawable =
+        TvCardDrawable().apply { setColor(Color.TRANSPARENT) }
 
     private fun label(value: String, size: Float, color: Int = TvStyle.text) =
         TextView(context).apply {
@@ -169,16 +191,54 @@ class HomeScreen(
     private var revision = 0
     private val notice = label("", 13f).apply { visibility = GONE }
 
-    fun showStatus(message: String) {
+    private val retryButton = label("重试", 15f).apply {
+        id = View.generateViewId()
+        isClickable = true
+        gravity = Gravity.CENTER
+        minHeight = dp(42)
+        setPadding(dp(24), dp(8), dp(24), dp(8))
+        TvStyle.stylePill(this)
+        visibility = GONE
+    }
+
+    fun showStatus(message: String, retry: (() -> Unit)? = null) {
         notice.text = message
         notice.visibility = if (message.isBlank()) GONE else VISIBLE
+        if (message.isNotBlank()) showLoading(false)
+        retryButton.visibility = if (retry != null) VISIBLE else GONE
+        retryButton.setOnClickListener { retry?.invoke() }
+        if (retry != null && cards.isEmpty()) retryButton.requestFocus()
+    }
+
+    /** Centred spinner while the page has nothing to show yet; no text. */
+    private val spinner = ProgressBar(context).apply {
+        indeterminateTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+        visibility = GONE
+    }
+    private var loadingRequested = false
+
+    fun showLoading(loading: Boolean) {
+        loadingRequested = loading
+        spinner.visibility = if (loading && cards.isEmpty()) VISIBLE else GONE
     }
 
     init {
         orientation = VERTICAL
         scroll.addView(contents)
-        addView(scroll, LayoutParams(-1, 0, 1f))
+        // Room for the focus lift of each row's first and last poster. The owner widens this
+        // screen by [liftRoom] on both sides (see MainActivity); the scroll pads the content back
+        // into place and lets rows draw into that padding.
+        scroll.setPadding(liftRoom, 0, liftRoom, 0)
+        scroll.clipChildren = false
+        contents.clipChildren = false
+        val frame = FrameLayout(context).apply { clipChildren = false }
+        frame.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+        frame.addView(spinner, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER))
+        addView(frame, LayoutParams(-1, 0, 1f))
     }
+
+    /** Horizontal margin the owner should give back as negative margins around this screen. */
+    val liftRoom: Int get() = dp(LIFT_ROOM_DP)
 
     fun capturePosition(): Position {
         val key =
@@ -257,6 +317,10 @@ class HomeScreen(
         revision++
         val ticket = revision
         restoring = true
+        // Keep the covers already on screen: new cards show them at once, so a rebuild (cache,
+        // then fresh data, then extra rows) does not flash blank posters while artwork rebinds.
+        val shownCovers = carriedCovers + currentCovers()
+        carriedCovers = emptyMap()
         contents.removeAllViews()
         leading?.let { contents.addView(it, LayoutParams(-1, -2).apply { bottomMargin = dp(16) }) }
         rows.clear()
@@ -266,7 +330,10 @@ class HomeScreen(
         shelves
             .filter { it.entries.isNotEmpty() || it.more != null }
             .forEach { shelf ->
-                val block = LinearLayout(context).apply { orientation = VERTICAL }
+                val block = LinearLayout(context).apply {
+                    orientation = VERTICAL
+                    clipChildren = false
+                }
                 val heading =
                     LinearLayout(context).apply {
                         orientation = HORIZONTAL
@@ -274,32 +341,33 @@ class HomeScreen(
                         setPadding(dp(2), dp(4), dp(2), dp(9))
                     }
                 heading.addView(
-                    View(context).apply { background = TvStyle.shape(context, accent, radius = 2) },
-                    LayoutParams(dp(3), dp(14)).apply { rightMargin = dp(8) },
-                )
-                heading.addView(
-                    label(shelf.title, 16f).apply { setTypeface(null, Typeface.BOLD) },
+                    label(shelf.title, 18f, Color.argb(225, 255, 255, 255)).apply { setTypeface(null, Typeface.BOLD) },
                     LayoutParams(0, -2, 1f),
                 )
-                heading.addView(label("左右选剧  ·  上下切换分区", 10f, TvStyle.muted))
                 block.addView(heading)
                 val horizontal =
                     HorizontalScrollView(context).apply {
                         isHorizontalScrollBarEnabled = false
-                        clipToPadding = false
-                        setPadding(dp(2), dp(2), dp(2), dp(2))
                     }
+                // The scroll view clips the row to the row's own bounds, so the room for TvMotion's
+                // focus lift must be padding on the row itself. The negative margins on the scroll
+                // view below keep the posters aligned with the heading.
                 val line =
                     LinearLayout(context).apply {
                         orientation = HORIZONTAL
                         gravity = Gravity.TOP
+                        setPadding(dp(LIFT_ROOM_DP), dp(LIFT_ROOM_DP), dp(LIFT_ROOM_DP), dp(LIFT_ROOM_DP))
                     }
                 horizontal.addView(line)
-                block.addView(horizontal)
+                block.addView(horizontal, LayoutParams(-1, -2).apply {
+                    leftMargin = -dp(LIFT_ROOM_DP)
+                    rightMargin = -dp(LIFT_ROOM_DP)
+                    topMargin = -dp(LIFT_ROOM_DP)
+                })
                 val rowCards = mutableListOf<Card>()
                 fun addCard(entry: Entry?, moreAction: (() -> Unit)? = null) {
                     val width =
-                        ((resources.displayMetrics.widthPixels - dp(160) - dp(56)) / 5)
+                        ((resources.displayMetrics.widthPixels - dp(CatalogShell.HORIZONTAL_INSET_DP) - dp(POSTER_GAP_DP) * (POSTERS_PER_ROW - 1)) / POSTERS_PER_ROW)
                             .toInt()
                             .coerceAtLeast(dp(100))
                     val key =
@@ -312,7 +380,8 @@ class HomeScreen(
                             tag = key
                             isFocusable = true
                             isFocusableInTouchMode = true
-                            setPadding(dp(4), dp(4), dp(4), dp(8))
+                            setPadding(0, 0, 0, dp(6))
+                            // Transparent card: TvMotion lifts it; the poster frame shows focus.
                             background = shape(false)
                         }
                     val image =
@@ -320,21 +389,32 @@ class HomeScreen(
                             ImageView(context).apply {
                                 scaleType = ImageView.ScaleType.CENTER_CROP
                                 importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+                                shownCovers[entry.series.cover]?.let { setImageDrawable(it) }
                             }
                         else null
-                    view.addView(
-                        image ?: label("›", 36f).apply { gravity = Gravity.CENTER },
-                        LayoutParams(-1, ((width - dp(8)) / TvStyle.POSTER_ASPECT).roundToInt()),
-                    )
+                    val poster = FrameLayout(context).apply {
+                        background = TvStyle.shape(context, TvStyle.surface, radius = 12)
+                        outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+                        clipToOutline = true
+                    }
+                    poster.addView(image ?: label("›", 36f).apply { gravity = Gravity.CENTER }, FrameLayout.LayoutParams(-1, -1))
+                    val ring = View(context).apply {
+                        background = TvStyle.shape(context, Color.TRANSPARENT, Color.WHITE, radius = 12).apply {
+                            setStroke(dp(3), Color.WHITE)
+                        }
+                        visibility = INVISIBLE
+                    }
+                    poster.addView(ring, FrameLayout.LayoutParams(-1, -1))
+                    view.addView(poster, LayoutParams(-1, (width / TvStyle.POSTER_ASPECT).roundToInt()))
                     val title =
-                        label(entry?.series?.title ?: "查看全部", 14f).apply {
+                        label(entry?.series?.title ?: "查看全部", 13f, TvStyle.muted).apply {
                             minLines = 2
                             maxLines = 2
                             ellipsize = TextUtils.TruncateAt.END
-                            setPadding(dp(3), dp(5), dp(3), 0)
+                            setPadding(dp(2), dp(8), dp(2), 0)
                         }
                     val badge =
-                        label(entry?.label ?: shelf.title, 12f, TvStyle.muted).apply {
+                        label(entry?.label ?: shelf.title, 11f, Color.argb(120, 255, 255, 255)).apply {
                             minLines = 1
                             maxLines = 1
                             ellipsize = TextUtils.TruncateAt.END
@@ -347,7 +427,9 @@ class HomeScreen(
                                 progress = entry?.progress ?: 0
                                 visibility = if (entry?.progress == null) INVISIBLE else VISIBLE
                                 progressTintList =
-                                    android.content.res.ColorStateList.valueOf(accent)
+                                    android.content.res.ColorStateList.valueOf(Color.WHITE)
+                                progressBackgroundTintList =
+                                    android.content.res.ColorStateList.valueOf(Color.argb(60, 255, 255, 255))
                             }
                     view.addView(title)
                     view.addView(badge)
@@ -380,7 +462,8 @@ class HomeScreen(
                         }
                     }
                     view.setOnFocusChangeListener { _, focused ->
-                        view.background = shape(focused)
+                        ring.visibility = if (focused) VISIBLE else INVISIBLE
+                        title.setTextColor(if (focused) Color.WHITE else TvStyle.muted)
                         if (focused) {
                             lastFocus = key
                             remember(key)
@@ -395,7 +478,7 @@ class HomeScreen(
                             lastRow = shelf.key
                         }
                     }
-                    line.addView(view, LayoutParams(width, -1).apply { rightMargin = dp(14) })
+                    line.addView(view, LayoutParams(width, -1).apply { rightMargin = dp(POSTER_GAP_DP) })
                     rowCards += card
                     cards[key] = card
                 }
@@ -404,11 +487,10 @@ class HomeScreen(
                 contents.addView(block, LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
                 rows += Row(shelf.key, block, horizontal, rowCards)
             }
-        if (cards.isEmpty())
-            contents.addView(
-                label("还没有本机记录，热门剧加载后可选择观看。", 15f).apply { setPadding(0, dp(16), 0, dp(16)) }
-            )
+        showLoading(loadingRequested)
         contents.addView(notice, LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        (retryButton.parent as? android.view.ViewGroup)?.removeView(retryButton)
+        contents.addView(retryButton, LayoutParams(-2, -2).apply { topMargin = dp(12) })
         val footer = mutableListOf<View>()
         if (more != null) {
             val next =
@@ -417,21 +499,21 @@ class HomeScreen(
                     tag = "home:more"
                     isFocusable = true
                     isFocusableInTouchMode = true
-                    setPadding(dp(12), dp(12), dp(12), dp(12))
-                    background = shape(false)
+                    setPadding(dp(24), dp(12), dp(24), dp(12))
+                    TvStyle.stylePill(this)
                     setOnFocusChangeListener { _, f ->
-                        background = shape(f)
                         if (f) lastFocus = tag.toString()
                     }
                     setOnClickListener { more() }
                 }
-            contents.addView(next, LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            contents.addView(next, LayoutParams(-2, -2).apply { topMargin = dp(8) })
             footer += next
             moreButton = next
         }
         rows.forEachIndexed { i, row ->
             row.cards.forEachIndexed { j, card ->
-                card.view.nextFocusLeftId = if (j == 0) sideEntry?.id ?: card.view.id else row.cards[j - 1].view.id
+                // Top navigation is reached with up, so the row's left edge stops here.
+                card.view.nextFocusLeftId = if (j == 0) card.view.id else row.cards[j - 1].view.id
                 card.view.nextFocusRightId =
                     row.cards[(j + 1).coerceAtMost(row.cards.lastIndex)].view.id
                 card.view.nextFocusUpId =
@@ -454,7 +536,7 @@ class HomeScreen(
                 action.nextFocusUpId = top.id
                 action.nextFocusDownId = below
             }
-            section.play.nextFocusLeftId = sideEntry?.id ?: section.play.id
+            section.play.nextFocusLeftId = section.play.id
         }
         top.nextFocusDownId = firstId()
         val preferred = focus.ifBlank { previous?.focus.orEmpty() }
@@ -626,7 +708,7 @@ class HomeScreen(
             val cardWidth = row.cards.firstOrNull()?.view?.width ?: return@forEach
             if (cardWidth <= 0) return@forEach
             val imageHeight =
-                ((cardWidth - dp(8)).coerceAtLeast(1) / TvStyle.POSTER_ASPECT).roundToInt()
+                (cardWidth.coerceAtLeast(1) / TvStyle.POSTER_ASPECT).roundToInt()
             row.cards.forEach { card ->
                 card.view.getChildAt(0).let { artwork ->
                     if (artwork.layoutParams.height != imageHeight)

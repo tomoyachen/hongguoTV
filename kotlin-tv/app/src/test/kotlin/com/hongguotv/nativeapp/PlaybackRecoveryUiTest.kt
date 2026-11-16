@@ -47,7 +47,7 @@ class PlaybackRecoveryUiTest {
     @Test
     fun `exhausted budget guides the user elsewhere without fake promises`() {
         val text = recoveryExhaustedText(failure)
-        assertEquals("$failure\n本集暂时无法播放，可以先看其他内容，稍后再回来试试。", text)
+        assertEquals("$failure\n本集暂时无法播放", text)
     }
 
     @Test

@@ -176,11 +176,11 @@ class TvSocialTest {
             flush(social)
             val d = ShadowDialog.getLatestDialog()
             val decor = d.window!!.decorView
-            assertTrue(views(decor).any { it.text.contains("已加载 2 条") })
+            assertTrue(views(decor).any { it.text.contains("2 / 3 条") })
             views(decor).first { it.text == "加载更多评论" }.performClick()
             flush(social)
             assertEquals(listOf("", "next"), calls)
-            assertTrue(views(decor).any { it.text.contains("已加载 3 条") })
+            assertTrue(views(decor).any { it.text.contains("3 / 3 条") })
             assertEquals(1, views(decor).count { it.text.contains("作者2") })
             views(decor).first { it.text == "关闭" }.performClick()
             ShadowLooper.idleMainLooper()

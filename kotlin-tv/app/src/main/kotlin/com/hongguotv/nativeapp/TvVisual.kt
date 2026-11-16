@@ -16,21 +16,32 @@ internal object TvVisual {
     val focusedValue = TvStyle.text
 
     fun panel(context: Context, modal: Boolean = false) = TvStyle.shape(
-        context, TvStyle.surface,
-        if (modal) TvStyle.outline else Color.TRANSPARENT, radius = 10,
+        context, if (modal) Color.rgb(28, 28, 33) else TvStyle.surface,
+        if (modal) Color.argb(36, 255, 255, 255) else Color.TRANSPARENT, radius = 18,
     )
 
+    /** List and settings rows: a soft highlight that [TvMotion] lifts slightly when focused. */
     fun row(context: Context, focused: Boolean, selected: Boolean = false, category: Boolean = false): Drawable =
-        TvStyle.shape(context,
-            if (focused) TvStyle.raised else if (selected || category) TvStyle.surface else Color.TRANSPARENT,
-            if (focused) TvStyle.text else if (selected) TvStyle.accent else Color.TRANSPARENT,
-            radius = 7)
+        TvCardDrawable().apply {
+            setColor(
+                when {
+                    focused -> Color.argb(56, 255, 255, 255)
+                    selected || category -> Color.argb(22, 255, 255, 255)
+                    else -> Color.TRANSPARENT
+                }
+            )
+            cornerRadius = 12 * context.resources.displayMetrics.density
+            if (selected && !focused) setStroke((1.5f * context.resources.displayMetrics.density).toInt(), Color.argb(90, 255, 255, 255))
+        }
 
     fun tab(context: Context, focused: Boolean, selected: Boolean): Drawable =
         TvStyle.shape(context,
-            if (focused) TvStyle.raised else if (selected) TvStyle.surface else Color.TRANSPARENT,
-            if (focused) TvStyle.text else if (selected) TvStyle.accent else Color.TRANSPARENT,
-            radius = 7)
+            when {
+                focused -> Color.WHITE
+                selected -> TvStyle.pillSelected
+                else -> Color.TRANSPARENT
+            },
+            radius = 999)
 
     fun backdrop(context: Context): Drawable = android.graphics.drawable.ColorDrawable(TvStyle.background)
 

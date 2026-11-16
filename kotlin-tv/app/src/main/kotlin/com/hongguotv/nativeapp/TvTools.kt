@@ -152,10 +152,12 @@ class TvTools(private val activity: Activity) {
                 contentDescription = value + if (checked) "，当前已选" else ""
             }
             val name = label(value, 16f).apply { setPadding(0, 0, dp(8), 0) }
-            val marker = label(if (checked) "✓" else "", 18f).apply {
+            val marker = label("", 18f).apply {
                 gravity = Gravity.CENTER
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 setPadding(0, 0, 0, 0)
+                // Drawn, not "✓": Android 6 TV fonts lack the character.
+                if (checked) TvTextGlyph.prefix(this, TvTextGlyph.Kind.CHECK)
             }
             covers.getOrNull(choices.size)?.takeIf { it.isNotBlank() }?.let { url ->
                 val poster = ImageView(activity).apply {
@@ -170,7 +172,7 @@ class TvTools(private val activity: Activity) {
             fun paint(focused: Boolean) {
                 row.background = TvVisual.row(activity, focused, checked)
                 name.setTextColor(TvVisual.primary)
-                marker.setTextColor(TvVisual.accent)
+                marker.setTextColor(TvStyle.text) // the drawn check takes this colour
             }
             paint(false)
             row.setOnFocusChangeListener { _, focused -> paint(focused) }
@@ -186,10 +188,6 @@ class TvTools(private val activity: Activity) {
             view.nextFocusLeftId = view.id
             view.nextFocusRightId = view.id
         }
-        content.addView(label("确定选择 · 返回取消", 12f).apply {
-            setTextColor(TvStyle.muted)
-            setPadding(dp(8), dp(8), dp(8), 0)
-        })
         next = AlertDialog.Builder(activity).create()
         next.setView(content, 0, 0, 0, 0)
         open(next, anchor)
@@ -236,12 +234,8 @@ class TvTools(private val activity: Activity) {
                         ellipsize = android.text.TextUtils.TruncateAt.END
                         setPadding(dp(10), dp(10), dp(10), dp(10))
                         contentDescription = value
-                        fun paint(focused: Boolean) {
-                            setTextColor(if (index == selected) TvStyle.accent else TvStyle.text)
-                            background = TvStyle.card(activity, focused, index == selected)
-                        }
-                        paint(false)
-                        setOnFocusChangeListener { _, focused -> paint(focused) }
+                        isSelected = index == selected
+                        TvStyle.stylePill(this)
                         setOnClickListener {
                             next.dismiss()
                             onChoice(index)
@@ -289,13 +283,13 @@ class TvTools(private val activity: Activity) {
         var replace = true
         val value = label(digits, 28f).apply { gravity = Gravity.CENTER }
         content.addView(value)
-        val error = label("输入集数后，选择「播放此集」", 14f)
+        val error = label("", 14f)
         content.addView(error)
         fun digit(key: String) {
             digits = if (replace) key else (digits + key).take(6)
             replace = false
             value.text = digits
-            error.text = "输入集数后，选择「播放此集」"
+            error.text = ""
         }
         fun erase() {
             digits = if (replace) "" else digits.dropLast(1)
@@ -317,11 +311,9 @@ class TvTools(private val activity: Activity) {
                             id = View.generateViewId()
                             text = key
                             minHeight = dp(42)
-                            backgroundTintList =
-                                android.content.res.ColorStateList(
-                                    arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
-                                    intArrayOf(TvStyle.accent, TvStyle.surface),
-                                )
+                            isAllCaps = false
+                            stateListAnimator = null
+                            TvStyle.stylePill(this)
                             setOnClickListener {
                                 when (key) {
                                     "清空" -> {
@@ -397,7 +389,7 @@ class TvTools(private val activity: Activity) {
         val content = column()
         val row = LinearLayout(activity).apply { gravity = Gravity.CENTER_VERTICAL }
         row.addView(qr(url), LinearLayout.LayoutParams(dp(185), dp(185)))
-        row.addView(label("手机与电视连接同一局域网，扫码后用浏览器打开。\n可以搜索剧名、遥控播放、管理片单。\n关闭此窗口后仍可控制，播放中也能使用。\n电视退出应用后连接失效；请勿分享二维码。", 16f), LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(label("手机连同一 Wi-Fi 扫码", 16f), LinearLayout.LayoutParams(0, -2, 1f))
         content.addView(row)
         content.addView(label(url, 12f))
         open(AlertDialog.Builder(activity).setTitle("手机扫码控制")
@@ -526,7 +518,7 @@ class TvTools(private val activity: Activity) {
                     val instructions = column()
                     instructions.addView(
                         label(
-                            "${selected.label} · ${selected.address}\n手机扫码后，用浏览器打开并提交。\n需要同一局域网；二维码有效 5 分钟。",
+                            "${selected.label} · ${selected.address}\n手机连同一 Wi-Fi 扫码",
                             16f,
                         )
                     )
@@ -614,7 +606,7 @@ class TvTools(private val activity: Activity) {
                     row.addView(qr(session.url), LinearLayout.LayoutParams(dp(185), dp(185)))
                     val instructions = column()
                     instructions.addView(
-                        label("手机扫码，用浏览器下载备份或选择备份文件恢复。\n仅限同一局域网；关闭即失效，最长 5 分钟。恢复需在电视确认。", 16f)
+                        label("手机连同一 Wi-Fi 扫码，下载或恢复备份", 16f)
                     )
                     instructions.addView(label(session.url, 12f))
                     row.addView(instructions, LinearLayout.LayoutParams(0, -2, 1f))

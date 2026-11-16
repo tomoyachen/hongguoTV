@@ -38,13 +38,13 @@ internal class DiscoveryScreen(
     private val controls = linkedMapOf<Pair<String, String>, TextView>()
     private val strips = linkedMapOf<String, HorizontalScrollView>()
     private val toggle =
-        button("收起筛选") {
+        button("收起") {
             expand(!state.expanded)
             toggleFocus()
         }
     private val reset = button("重置") { change(DiscoverySelection()) }
     private val refresh = button("刷新") { request(null) }
-    private val emptyState = TvEmptyState(context, "正在加载剧目", "稍候，即可按类型浏览")
+    private val emptyState = TvEmptyState(context, "正在加载剧目", "")
     private val browser: ContinuousCatalogView
     private var filterDialog: AlertDialog? = null
     private var loading = false
@@ -195,11 +195,11 @@ internal class DiscoveryScreen(
             isClickable = true
             setPadding(dp(8), dp(5), dp(8), dp(5))
             minHeight = dp(30)
+            setPadding(dp(12), dp(5), dp(12), dp(5))
+            TvStyle.stylePill(this)
             fun paint() {
-                val selected = chosen()
-                isSelected = selected
-                setTextColor(if (selected) TvStyle.accent else TvStyle.text)
-                background = TvStyle.card(context, hasFocus(), selected)
+                isSelected = chosen()
+                refreshDrawableState()
             }
             setOnFocusChangeListener { _, _ -> paint() }
             setOnClickListener { action() }
@@ -216,7 +216,7 @@ internal class DiscoveryScreen(
         requestLayout()
         state.expanded = value
         scroll.visibility = if (value) VISIBLE else GONE
-        toggle.text = if (value) "收起筛选" else "展开筛选"
+        toggle.text = if (value) "收起" else "筛选"
         val target =
             if (value)
                 controls.entries.firstOrNull { it.key.first != "genre" }?.value?.id
@@ -449,7 +449,7 @@ internal class DiscoveryScreen(
         val ticket = ++serial
         loading = true
         emptyState.heading.text = "正在加载剧目"
-        emptyState.description.text = "稍候，即可按类型浏览"
+        emptyState.description.text = ""
         refresh.text = "读取中…"
         summary.text = if (cursor == null) "正在按当前条件加载…" else "正在继续加载…"
         fetch(state.selection, cursor) { result, error ->
@@ -475,10 +475,10 @@ internal class DiscoveryScreen(
                 browser.fail(error)
                 summary.text = "加载失败，已保留列表 · ${selectionSummary()}"
             } else {
-                summary.text = "分类读取失败，请按刷新重试"
+                summary.text = "分类读取失败"
                 if (!state.loaded) {
                     emptyState.heading.text = "暂时无法加载剧目"
-                    emptyState.description.text = "请检查网络连接，再选择右上角刷新"
+                    emptyState.description.text = ""
                 }
             }
         }

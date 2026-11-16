@@ -75,6 +75,11 @@ class TvSocial(
         overlay = BulletView().also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
     }
 
+    /** Fades danmaku back while playback controls are open, so the controls stay readable. */
+    fun dimForControls(dimmed: Boolean) {
+        overlay?.animate()?.alpha(if (dimmed) .12f else 1f)?.setDuration(150)?.start()
+    }
+
     fun foreground(value: Boolean) {
         active = value
         main.removeCallbacks(tick)
@@ -158,8 +163,8 @@ class TvSocial(
             isFocusable = true
             isFocusableInTouchMode = true
             minHeight = dp(48)
-            background = TvStyle.card(activity, false)
-            setOnFocusChangeListener { _, focus -> background = TvStyle.card(activity, focus) }
+            setPadding(dp(20), paddingTop, dp(20), paddingBottom)
+            TvStyle.stylePill(this)
             setOnClickListener { action() }
         }
 
@@ -198,10 +203,10 @@ class TvSocial(
                 setPadding(dp(10), 0, 0, 0)
             }
             lateinit var opener: TextView
-            opener = button("$title ▸") {
+            opener = button("$title ›") {
                 val expanded = content.visibility != View.VISIBLE
                 content.visibility = if (expanded) View.VISIBLE else View.GONE
-                opener.text = "$title ${if (expanded) "▾" else "▸"}"
+                opener.text = if (expanded) "收起$title" else "$title ›"
             }
             body.addView(opener)
             body.addView(content)
@@ -265,7 +270,6 @@ class TvSocial(
             android.app.AlertDialog.Builder(activity).setTitle("弹幕读取诊断")
                 .setMessage(report).setPositiveButton("关闭", null).show()
         })
-        body.addView(label("真实时间轴弹幕；无内容时不使用普通评论代替。", 14f))
         body.addView(button("关闭") { d.dismiss() })
         d.setContentView(ScrollView(activity).apply { addView(body) })
         d.setOnDismissListener { if (anchor.isAttachedToWindow) anchor.requestFocus() }
@@ -396,13 +400,13 @@ class TvSocial(
                                 val next = page.getString("nextCursor")
                                 if (!cursors.add(next)) {
                                     more = false
-                                    status.text = "游标重复，停止自动加载；可重新打开重试。"
+                                    status.text = "没有更多评论"
                                 }
                                 cursor = next
                             }
                             status.text =
-                                if (mode) "官网节选 ${seen.size} 条 / 共 ${page.optLong("total")} 条"
-                                else "已加载 ${seen.size} 条 / 共 ${page.optLong("total")} 条"
+                                if (mode) "官网节选 ${seen.size} / ${page.optLong("total")} 条"
+                                else "${seen.size} / ${page.optLong("total")} 条"
                             load.text = if (more) "加载更多评论" else if (mode) "官网剧评节选已读完" else "已到末尾"
                         }
                     } catch (_: Exception) {
@@ -415,7 +419,7 @@ class TvSocial(
                             ) {
                                 busy = false
                                 load.text = "加载失败，按确认重试"
-                                status.text = "保留已有评论，重试使用原游标"
+                                status.text = ""
                             }
                         }
                     }
@@ -438,7 +442,6 @@ class TvSocial(
         tabs.addView(button("整剧剧评") { select(true) }, LinearLayout.LayoutParams(0, -2, 1f))
         load = button("加载更多评论") { read() }
         body.addView(load)
-        body.addView(label("上下浏览，到底继续加载。发送、回复未接入。", 13f))
         body.addView(button("关闭") { d.dismiss() })
         scroll.viewTreeObserver.addOnScrollChangedListener {
             val y = scroll.scrollY

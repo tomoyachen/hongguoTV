@@ -19,7 +19,7 @@ android {
     compileSdk = 36
     defaultConfig {
         applicationId = "com.hongguotv.nativeapp"
-        manifestPlaceholders["appLabel"] = "hongguoTV"
+        manifestPlaceholders["appLabel"] = "红果 TV"
         minSdk = 21
         targetSdk = 36
         versionCode = System.getenv("HONGGUOTV_VERSION_CODE")?.toInt() ?: 23
@@ -56,7 +56,7 @@ android {
         getByName("debug") {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug.20261114"
-            manifestPlaceholders["appLabel"] = "hongguoTV"
+            manifestPlaceholders["appLabel"] = "红果 TV"
         }
         getByName("release") {
             signingConfig = signingConfigs.getByName("delivery")

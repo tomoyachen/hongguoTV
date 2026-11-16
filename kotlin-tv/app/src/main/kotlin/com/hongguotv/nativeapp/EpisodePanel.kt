@@ -50,11 +50,8 @@ class EpisodePanel(
             minHeight = dp(46)
             isFocusable = true
             isFocusableInTouchMode = true
-            fun paint(focus: Boolean) {
-                background = TvStyle.card(activity, focus, active)
-            }
-            paint(false)
-            setOnFocusChangeListener { _, hasFocus -> paint(hasFocus) }
+            isSelected = active
+            TvStyle.stylePill(this)
             setOnClickListener { action() }
         }
 

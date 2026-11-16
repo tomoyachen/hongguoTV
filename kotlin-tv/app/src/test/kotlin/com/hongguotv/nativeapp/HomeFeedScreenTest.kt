@@ -391,7 +391,7 @@ class HomeFeedScreenTest {
             screen.resume()
             pump(screen)
             assertEquals(0, state.episodeIndex)
-            assertTrue(texts(screen).any { it.text.contains("已关闭自动下一集") })
+            assertTrue(texts(screen).any { it.text.contains("自动下一集已关闭") })
         } finally { screen.close(); controller.pause().stop().destroy() }
     }
 
