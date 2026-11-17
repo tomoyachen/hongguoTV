@@ -113,7 +113,7 @@ class HomeScreen(
         val cards: List<Card>,
     )
 
-    private val accent = TvStyle.accent
+    private val accent get() = TvStyle.accent
 
     private fun currentCovers(): Map<String, android.graphics.drawable.Drawable> =
         cards.values.mapNotNull { card ->

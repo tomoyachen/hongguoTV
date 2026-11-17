@@ -4,6 +4,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PlaybackSourcesTest {
+    @Test fun diagnosticsIncludeSuppressedPrimaryAndRecoveryWithoutLeakingRawErrorsOrLooping() {
+        val primary = com.hongguotv.core.EmptyPlaybackResponseException("S:b=200/0B/h2 rotated=1 reg=ok")
+        val fallback = com.hongguotv.core.EmptyPlaybackResponseException("stage=compatibility-model CS:other=200/0B/h1 CM:b=200/0B/h1")
+        fallback.addSuppressed(com.hongguotv.core.PlaybackDiagnosticException("compat-reg=cooldown"))
+        fallback.addSuppressed(primary)
+        fallback.addSuppressed(java.io.IOException("https://private.example/?token=secret"))
+        primary.addSuppressed(fallback)
+        val detail = diagnosticDetail(fallback)!!
+        assertTrue(detail.contains("CS:other=200/0B/h1"))
+        assertTrue(detail.contains("S:b=200/0B/h2"))
+        assertTrue(detail.contains("compat-reg=cooldown"))
+        assertFalse(detail.contains("secret"))
+        assertEquals("播放信息接口返回空响应", playbackFailureSummary(fallback))
+        val rejectedPrimary = java.io.IOException("wrapper").apply { addSuppressed(com.hongguotv.core.ContentHttpException(403)) }
+        assertEquals("http=403", diagnosticDetail(rejectedPrimary))
+    }
+
+    @Test
+    fun timeoutDiagnosticsSeparatePreparationAndTransportWithoutLeakingMessages() {
+        assertEquals("timeout=preparation", diagnosticDetail(java.net.SocketTimeoutException("播放准备超时")))
+        assertEquals("timeout=prefetch_wait", diagnosticDetail(java.net.SocketTimeoutException("预加载等待超时")))
+        assertEquals("timeout=transport", diagnosticDetail(java.net.SocketTimeoutException("https://private.example/?token=secret")))
+        assertEquals("timeout=deadline", diagnosticDetail(java.io.InterruptedIOException("deadline reached")))
+    }
+
     @Test
     fun diagnosticDetailRetainsLastCandidateAndRegistrationResult() {
         val detail = "G:b=200/0B/h2 P:b=200/0B/h2 P:hl=200/0B/h2 P:lf=200/0B/h2 rotated=1 reg=failed"
@@ -99,8 +124,8 @@ class PlaybackSourcesTest {
 
     @Test
     fun diagnosticDetailCapsLengthWithoutLosingLastPathAndRegistration() {
-        val detail = diagnosticDetail(com.hongguotv.core.EmptyPlaybackResponseException("x".repeat(200)))
-        assertEquals(180, detail!!.length)
+        val detail = diagnosticDetail(com.hongguotv.core.EmptyPlaybackResponseException("x".repeat(700)))
+        assertEquals(640, detail!!.length)
     }
 
     @Test

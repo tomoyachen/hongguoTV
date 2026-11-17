@@ -17,13 +17,37 @@ import android.widget.TextView
  * which old Android 5/6 TVs cannot afford.
  */
 object TvStyle {
-    val background = Color.rgb(12, 12, 16)
-    val surface = Color.rgb(30, 30, 36)
-    val raised = Color.rgb(54, 54, 62)
-    val accent = Color.rgb(255, 92, 80)
-    val text = Color.rgb(245, 245, 247)
-    val muted = Color.rgb(150, 150, 160)
-    val outline = Color.rgb(60, 60, 68)
+    data class Palette(
+        val id: String, val label: String, val background: Int, val surface: Int,
+        val raised: Int, val accent: Int, val text: Int, val muted: Int, val outline: Int,
+    )
+    // The Apple TV–style design is built on a dark canvas with white focus, so only the dark
+    // palette is offered; light palettes would make the white focus pills invisible. The theme API
+    // from upstream stays so its settings and persistence keep working.
+    val themes = listOf(
+        Palette(
+            "dark", "深色",
+            Color.rgb(12, 12, 16), Color.rgb(30, 30, 36), Color.rgb(54, 54, 62), Color.rgb(255, 92, 80),
+            Color.rgb(245, 245, 247), Color.rgb(150, 150, 160), Color.rgb(60, 60, 68),
+        ),
+    )
+    var current: Palette = themes.first()
+        private set
+    fun load(context: Context) {
+        val id = context.getSharedPreferences("appearance", Context.MODE_PRIVATE).getString("theme", "dark")
+        current = themes.firstOrNull { it.id == id } ?: themes.first()
+    }
+    fun select(context: Context, palette: Palette) {
+        current = palette
+        context.getSharedPreferences("appearance", Context.MODE_PRIVATE).edit().putString("theme", palette.id).apply()
+    }
+    val background get() = current.background
+    val surface get() = current.surface
+    val raised get() = current.raised
+    val accent get() = current.accent
+    val text get() = current.text
+    val muted get() = current.muted
+    val outline get() = current.outline
     /** Text drawn on a focused (white) pill. */
     val onFocus = Color.rgb(16, 16, 20)
     val pillIdle = Color.argb(40, 255, 255, 255)

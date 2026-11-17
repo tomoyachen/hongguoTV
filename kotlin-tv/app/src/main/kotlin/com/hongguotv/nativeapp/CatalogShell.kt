@@ -167,14 +167,12 @@ internal class CatalogShell(context: Context, private val phone: (View) -> Unit 
             focused !is android.widget.AbsListView) {
             val direction = if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) FOCUS_UP else FOCUS_DOWN
             val next = focused?.focusSearch(direction)
-            // Pages pin up on their top row to themselves (from the old side-rail design); with the
-            // bar on top, "nowhere further up" means the bar.
-            val stuckUp = direction == FOCUS_UP && next === focused
-            if (next == null || !inContent(next) || stuckUp) {
-                // Nothing further up on the page: hand focus to the bar, like tvOS.
-                if (direction == FOCUS_UP) navigation[selectedDestination].requestFocus()
-                else android.view.FocusFinder.getInstance().findNextFocus(body, focused, direction)
-                    ?.takeIf { inContent(it) }?.requestFocus()
+            if (next == null || next === focused || !inContent(next)) {
+                val contentTarget = android.view.FocusFinder.getInstance()
+                    .findNextFocus(body, focused, direction)
+                    ?.takeIf { it !== focused && inContent(it) }
+                if (contentTarget != null) contentTarget.requestFocus()
+                else if (direction == FOCUS_UP) navigation[selectedDestination].requestFocus()
                 return true
             }
         }

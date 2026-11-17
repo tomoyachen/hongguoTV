@@ -12,6 +12,33 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [21, 26], qualifiers = "w960dp-h540dp-land-mdpi")
 class CatalogShellTest {
+    @Test fun upAtContentTopReturnsToSelectedColumnAndRightRestoresPosition() {
+        val controller = Robolectric.buildActivity(Activity::class.java).setup()
+        var navigated = -1
+        val shell = CatalogShell(controller.get()) { navigated = it }
+        try {
+            controller.get().setContentView(shell)
+            shell.select(2)
+            val content = TextView(controller.get()).apply {
+                isFocusable = true
+                id = android.view.View.generateViewId()
+                nextFocusUpId = id
+            }
+            shell.body.addView(content)
+            shell.measure(android.view.View.MeasureSpec.makeMeasureSpec(960, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(540, android.view.View.MeasureSpec.EXACTLY))
+            shell.layout(0, 0, 960, 540)
+            content.requestFocus()
+            fun key(code: Int) { shell.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code)) }
+            key(android.view.KeyEvent.KEYCODE_DPAD_UP)
+            assertTrue(shell.navigation[2].hasFocus())
+            key(android.view.KeyEvent.KEYCODE_DPAD_RIGHT)
+            assertTrue(content.hasFocus())
+            key(android.view.KeyEvent.KEYCODE_DPAD_UP)
+            key(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
+            assertEquals(-1, navigated)
+        } finally { controller.pause().stop().destroy() }
+    }
+
     @Test
     @Config(qualifiers = "w640dp-h360dp-land-mdpi")
     fun compactRailKeepsSettingsAndScanVisible() {

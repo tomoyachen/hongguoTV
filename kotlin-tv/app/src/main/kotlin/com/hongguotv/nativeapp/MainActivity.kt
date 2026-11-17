@@ -40,11 +40,11 @@ private const val EXIT_BACK_WINDOW_MS = 2000L
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class MainActivity : Activity() {
-    private val bg = TvStyle.background
-    private val surface = TvStyle.surface
-    private val accent = TvStyle.accent
-    private val white = TvStyle.text
-    private val muted = TvStyle.muted
+    private val bg get() = TvStyle.background
+    private val surface get() = TvStyle.surface
+    private val accent get() = TvStyle.accent
+    private val white get() = TvStyle.text
+    private val muted get() = TvStyle.muted
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newFixedThreadPool(3)
     private val repository = ContentRepository(playbackSession = PlaybackDeviceSession.shared)
@@ -412,7 +412,7 @@ class MainActivity : Activity() {
     private var startupApplied = false
     private var settingsAccountStatus: TextView? = null
     private var settingsGroup = 0
-    private val settingsPositions = IntArray(4)
+    private val settingsPositions = IntArray(5)
     private var settingsSidebar = emptyList<View>()
     private var settingsRows = emptyList<View>()
     private var page = 1
@@ -614,6 +614,7 @@ class MainActivity : Activity() {
     // 启动入口：创建根容器，初始化账户、更新和媒体控制，再异步读取本机记录。
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        TvStyle.load(this)
         ContentRepository.deviceStore = PreferencesPlayerDeviceStore(
             getSharedPreferences("native-player-device", MODE_PRIVATE)
         )
@@ -918,6 +919,7 @@ class MainActivity : Activity() {
         leaveCollection()
         tabState[tab] = CatalogState(page, catalog, hasMore, ranking)
         tabFocus[tab] = catalogFocus
+        if (next == 6) { settingsGroup = 0; settingsPositions[0] = 0 }
         tab = next
         val saved = tabState[next]
         page = saved?.page ?: 1
@@ -925,7 +927,7 @@ class MainActivity : Activity() {
         hasMore = saved?.hasMore ?: false
         ranking = saved?.ranking
         catalogFocus = tabFocus[next].orEmpty()
-        showCatalog(load = ((next <= 2 || next == 7 && query.isNotBlank()) && catalog.isEmpty()), focusNav = keepNavigationFocus && next != 7)
+        showCatalog(load = ((next <= 2 || next == 7 && query.isNotBlank()) && catalog.isEmpty()), focusNav = keepNavigationFocus && next != 7 && next != 6)
         if (next == 7) tvSearchPanel?.entry()?.requestFocus()
         refreshAccountSection()
     }
@@ -2381,7 +2383,7 @@ class MainActivity : Activity() {
         }
         scroll.addView(content, android.widget.FrameLayout.LayoutParams(-1, -2))
         layout.addView(scroll, lp(0, -1).apply { weight = 1f })
-        val categories = listOf("播放", "外观与操作", "账户", "应用与更新")
+        val categories = listOf("检查更新", "播放", "外观与操作", "账户", "关于应用")
         val entries = mutableListOf<View>()
         fun setting(label: String, action: () -> Unit): TextView {
             val view = SettingsValueView(this).apply {
@@ -2421,7 +2423,7 @@ class MainActivity : Activity() {
             view.addView(control)
             view.setOnFocusChangeListener { _, focused ->
                 view.background = TvVisual.row(this@MainActivity, focused)
-                (view.getChildAt(0) as? TextView)?.setTextColor(if (focused) Color.WHITE else TvVisual.primary)
+                (view.getChildAt(0) as? TextView)?.setTextColor(TvVisual.primary)
                 control.rowFocused = focused
             }
             fun describe() { view.contentDescription = "$label，${if (control.isChecked) "开启" else "关闭"}，按确定切换" }
@@ -2456,9 +2458,16 @@ class MainActivity : Activity() {
             content.removeAllViews()
             scroll.scrollTo(0, 0)
             content.addView(text(categories[index], 20f).apply { setTypeface(null, Typeface.BOLD) })
-            content.addView(View(this).apply { setBackgroundColor(Color.argb(18, 255, 255, 255)) }, lp(-1, dp(1)).apply { topMargin = dp(12); bottomMargin = dp(10) })
+            content.addView(View(this).apply { setBackgroundColor(TvStyle.outline) }, lp(-1, dp(1)).apply { topMargin = dp(12); bottomMargin = dp(10) })
             when (index) {
                 0 -> {
+                    content.addView(text("当前版本  ·  ${BuildConfig.VERSION_NAME}", 17f).apply {
+                        setPadding(0, dp(4), 0, dp(12))
+                    })
+                    lateinit var updates: TextView
+                    updates = setting("检查更新") { updater.show(updates) }
+                }
+                1 -> {
                     lateinit var qualityButton: TextView
                     qualityButton = setting("默认清晰度  ·  ${library.maxQuality}P") { showQualityPicker(qualityButton, false) }
                     lateinit var speed: TextView
@@ -2471,7 +2480,8 @@ class MainActivity : Activity() {
                     toggle("自动连播", library.autoNext) { library.autoNext = it }
                     toggle("跨季自动连播（需开启自动连播）", library.seasonAutoplay) { library.seasonAutoplay = it }
                 }
-                1 -> {
+                2 -> {
+                    // No theme picker: the Apple TV–style design ships one dark palette (TvStyle).
                     val labels = listOf("首页", "找剧", "排行榜", "收藏", "观看历史", "账户预约", "设置", "搜索", "随心看")
                     lateinit var startup: TextView
                     startup = setting("启动页面  ·  ${labels[library.startupPage]}") {
@@ -2490,7 +2500,7 @@ class MainActivity : Activity() {
                         }, selected = library.clockMode)
                     }
                 }
-                2 -> {
+                3 -> {
                     content.addView(text(accountSettingsLabel(), 15f, muted).apply {
                         settingsAccountStatus = this
                         setPadding(0, 0, 0, dp(14))
@@ -2498,9 +2508,7 @@ class MainActivity : Activity() {
                     setting("登录与账户管理") { cloudAccount.show() }
                     setting("手机控制台 · 搜索 / 遥控 / 账户片单") { phoneConsole.show(null) }
                 }
-                3 -> {
-                    lateinit var updates: TextView
-                    updates = setting("版本与更新  ·  ${BuildConfig.VERSION_NAME}") { updater.show(updates) }
+                4 -> {
                     lateinit var about: TextView
                     about = setting("关于红果 TV") {
                         tvTools.info("关于红果 TV", "红果 TV · 非官方客户端\n基于 N3urda/hongguoTV\n功能同步：tsukiyo-zero/hongguoTV\n版本：${BuildConfig.VERSION_NAME}\n项目：https://github.com/N3urda/hongguoTV\n\n本应用与红果官方无隶属关系。", about)
@@ -3194,7 +3202,7 @@ class MainActivity : Activity() {
             root.addView(view, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
             view.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyVideoRotation() }
             view.post { if (playerView === view) applyVideoRotation() }
-            persistentTime = text("", 12f, white)
+            persistentTime = text("", 12f, Color.WHITE)
             persistentBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 1000; progressTintList = android.content.res.ColorStateList.valueOf(accent) }
             persistentProgress = column().apply {
                 isFocusable = false
@@ -3210,7 +3218,7 @@ class MainActivity : Activity() {
                 format12Hour = "HH:mm"
                 format24Hour = "HH:mm"
                 textSize = 18f
-                setTextColor(white)
+                setTextColor(Color.WHITE)
                 setPadding(dp(10), dp(5), dp(10), dp(5))
                 background = rounded(Color.argb(150, 11, 15, 21))
                 isFocusable = false
@@ -3246,13 +3254,13 @@ class MainActivity : Activity() {
                     })
                 }
             playbackTitle =
-                text("", 23f).apply {
+                text("", 23f, Color.WHITE).apply {
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     setTypeface(null, Typeface.BOLD)
                 }
             hud.addView(playbackTitle)
-            playbackText = text("", 15f, muted).apply { setPadding(0, dp(10), 0, dp(9)) }
+            playbackText = text("", 15f, Color.LTGRAY).apply { setPadding(0, dp(10), 0, dp(9)) }
             hud.addView(playbackText)
             progressBar =
                 ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -3826,6 +3834,24 @@ class MainActivity : Activity() {
     private fun playbackDriftListener(p: ExoPlayer): AnalyticsListener {
         val guard = PlaybackSyncGuard()
         return object : AnalyticsListener {
+            private var bufferingStartedAt: Long? = null
+
+            override fun onPlaybackStateChanged(eventTime: AnalyticsListener.EventTime, state: Int) {
+                if (player !== p) return
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (state == Player.STATE_BUFFERING && bufferingStartedAt == null) {
+                    bufferingStartedAt = now
+                    val runtime = Runtime.getRuntime()
+                    // No media URLs or account data: retain enough evidence for long-session stalls.
+                    android.util.Log.i("HGPlayback", "Buffering start episode=${episodeIndex + 1} positionMs=${p.currentPosition} bufferedMs=${p.totalBufferedDuration} queue=${p.mediaItemCount} heapMb=${(runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)}")
+                } else if (state != Player.STATE_BUFFERING) {
+                    bufferingStartedAt?.let { started ->
+                        android.util.Log.i("HGPlayback", "Buffering end state=$state elapsedMs=${now - started} bufferedMs=${p.totalBufferedDuration}")
+                    }
+                    bufferingStartedAt = null
+                }
+            }
+
             override fun onVideoFrameProcessingOffset(
                 eventTime: AnalyticsListener.EventTime,
                 totalProcessingOffsetUs: Long,

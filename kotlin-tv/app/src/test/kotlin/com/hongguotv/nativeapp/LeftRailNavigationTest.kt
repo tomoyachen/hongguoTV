@@ -32,7 +32,7 @@ class LeftRailNavigationTest {
     private fun views(view: View): List<View> = listOf(view) +
         if (view is ViewGroup) (0 until view.childCount).flatMap { views(view.getChildAt(it)) } else emptyList()
 
-    @Test fun repeatedUpKeepsSecondaryMenuReachableAndLeftStillOpensRail() {
+    @Test fun upReachesSecondaryMenuThenRailAndLeftStillOpensRail() {
         val controller = Robolectric.buildActivity(Activity::class.java).setup()
         val activity = controller.get()
         val shell = CatalogShell(activity) {}.apply { select(1) }
@@ -72,9 +72,8 @@ class LeftRailNavigationTest {
             card.requestFocus()
             key(KeyEvent.KEYCODE_DPAD_UP)
             assertTrue(first.hasFocus() || second.hasFocus())
-            val selectedFilter = shell.findFocus()
-            repeat(6) { key(KeyEvent.KEYCODE_DPAD_UP) }
-            assertSame(selectedFilter, shell.findFocus())
+            key(KeyEvent.KEYCODE_DPAD_UP)
+            assertTrue(shell.navigation[1].hasFocus())
             first.requestFocus()
             key(KeyEvent.KEYCODE_DPAD_RIGHT)
             assertTrue(second.hasFocus())
@@ -129,6 +128,30 @@ class LeftRailNavigationTest {
             shell.navigation[2].performClick()
             assertEquals(listOf(2), navigated)
         } finally { browser.close(); controller.pause().stop().destroy() }
+    }
+
+    @Test fun enteringSettingsAlwaysStartsAtUpdateAction() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).create()
+        val activity = controller.get()
+        fun field(name: String) = activity.javaClass.getDeclaredField(name).apply { isAccessible = true }
+        try {
+            val library = field("library").get(activity) as Library
+            val loader = library.javaClass.getDeclaredField("loader").apply { isAccessible = true }
+            (loader.get(library) as java.util.concurrent.ExecutorService).submit {}.get(5, java.util.concurrent.TimeUnit.SECONDS)
+            ShadowLooper.idleMainLooper()
+            val switch = activity.javaClass.getDeclaredMethod("switchTab", Int::class.javaPrimitiveType).apply { isAccessible = true }
+            repeat(2) {
+                field("settingsGroup").setInt(activity, 2)
+                switch.invoke(activity, 6)
+                layout(activity.window.decorView)
+                assertEquals(0, field("settingsGroup").getInt(activity))
+                assertEquals("检查更新", ((field("root").get(activity) as View).findFocus() as TextView).text.toString())
+                val labels = views(field("root").get(activity) as View).filterIsInstance<TextView>()
+                assertTrue(labels.any { it.text.toString().startsWith("当前版本") })
+                val shell = field("catalogShell").get(activity) as CatalogShell
+                assertFalse(views(shell.getChildAt(0)).filterIsInstance<TextView>().any { it.text == "检查更新" })
+            }
+        } finally { controller.destroy() }
     }
 
     @Test fun everyPrimaryDestinationBackConfirmsExitAndCancelKeepsFocus() {
